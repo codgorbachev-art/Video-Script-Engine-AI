@@ -110,15 +110,16 @@ export async function generateThumbnailVisual(idea: string): Promise<string> {
 
   const candidates = response.candidates;
   if (candidates && candidates.length > 0) {
-    const parts = candidates[0].content?.parts;
+    const candidate = candidates[0];
+    const parts = candidate.content?.parts;
     if (parts) {
       for (const part of parts) {
-        if (part.inlineData) {
+        if (part.inlineData?.data) {
           return `data:image/png;base64,${part.inlineData.data}`;
         }
       }
     }
   }
   
-  throw new Error("Не удалось сгенерировать изображение. Попробуйте другой запрос.");
+  throw new Error("Не удалось сгенерировать изображение. Попробуйте другой запрос или проверьте лимиты.");
 }

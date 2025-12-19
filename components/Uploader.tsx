@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Attachment } from "../types";
@@ -17,19 +18,24 @@ interface UploaderProps {
   hint?: string;
 }
 
+const TYPE_COLORS = {
+  image: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+  pdf: "text-rose-500 bg-rose-500/10 border-rose-500/20",
+  text: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+  other: "text-zinc-500 bg-zinc-500/10 border-zinc-500/20"
+};
+
 export const Uploader: React.FC<UploaderProps> = (props) => {
   const { onAttachmentsChange, maxFiles = 3, hint } = props;
   const ref = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<FileStatus[]>([]);
   const lastEmittedRef = useRef<string>("");
 
-  // Notify parent whenever valid files change, avoiding redundant updates during progress
   useEffect(() => {
     const validAttachments = files
       .filter((f) => f.status === "success" && f.result)
       .map((f) => f.result!);
 
-    // Simple signature to prevent spamming parent with updates if the successful list hasn't changed
     const signature = JSON.stringify(validAttachments.map(v => v.name + v.dataBase64.length));
 
     if (signature !== lastEmittedRef.current) {
@@ -42,7 +48,7 @@ export const Uploader: React.FC<UploaderProps> = (props) => {
     updateFile(id, { status: "uploading", progress: 0 });
 
     if (file.size > 5 * 1024 * 1024) {
-      updateFile(id, { status: "error", errorMessage: "Файл > 5 МБ" });
+      updateFile(id, { status: "error", errorMessage: "Превышен лимит 5МБ" });
       return;
     }
 
@@ -51,7 +57,7 @@ export const Uploader: React.FC<UploaderProps> = (props) => {
         const reader = new FileReader();
         reader.onprogress = (e) => {
           if (e.lengthComputable) {
-            updateFile(id, { progress: (e.loaded / e.total) * 100 });
+            updateFile(id, { progress: Math.round((e.loaded / e.total) * 100) });
           }
         };
         reader.onload = () => {
@@ -73,7 +79,7 @@ export const Uploader: React.FC<UploaderProps> = (props) => {
         },
       });
     } catch (e) {
-      updateFile(id, { status: "error", errorMessage: "Ошибка" });
+      updateFile(id, { status: "error", errorMessage: "Сбой загрузки" });
     }
   };
 
@@ -84,8 +90,6 @@ export const Uploader: React.FC<UploaderProps> = (props) => {
   const handleFiles = (fileList: FileList | null) => {
     if (!fileList) return;
     
-    // Filter out duplicates by name if needed, or just append. 
-    // Here we respect maxFiles limit total.
     const remainingSlots = maxFiles - files.length;
     if (remainingSlots <= 0) return;
 
@@ -98,10 +102,8 @@ export const Uploader: React.FC<UploaderProps> = (props) => {
     }));
 
     setFiles((prev) => [...prev, ...newFileEntries]);
-
     newFileEntries.forEach((entry) => processFile(entry.file, entry.id));
     
-    // Reset input so same file can be selected again if needed (after delete)
     if (ref.current) ref.current.value = "";
   };
 
@@ -109,127 +111,113 @@ export const Uploader: React.FC<UploaderProps> = (props) => {
     setFiles((prev) => prev.filter((f) => f.id !== id));
   };
 
+  const getFormatDetails = (mime: string) => {
+    if (mime.includes("pdf")) return { label: "PDF", style: TYPE_COLORS.pdf };
+    if (mime.includes("image")) return { label: "IMG", style: TYPE_COLORS.image };
+    if (mime.includes("text")) return { label: "TXT", style: TYPE_COLORS.text };
+    return { label: "FILE", style: TYPE_COLORS.other };
+  };
+
   return (
-    <div className="space-y-4">
-       <div className="flex items-center justify-between pl-1">
-        <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Материалы</label>
-        <span className="text-[10px] text-zinc-600 bg-zinc-900/50 px-2 py-0.5 rounded border border-zinc-800">
-           {files.length} / {maxFiles}
-        </span>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between px-2">
+        <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] font-mono">Документы ({files.length}/{maxFiles})</label>
+        {files.length > 0 && (
+           <button 
+             onClick={() => setFiles([])}
+             className="text-[9px] font-bold text-zinc-700 hover:text-rose-400 uppercase transition-colors"
+           >
+             Очистить
+           </button>
+        )}
       </div>
 
-      {/* Drop/Select Zone */}
       {files.length < maxFiles && (
-        <div className="group relative rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/20 p-6 transition-all hover:border-zinc-600 hover:bg-zinc-900/40">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-            <div className="flex items-start gap-3">
-              <div className="mt-1 p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 group-hover:text-zinc-200 transition-colors">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              </div>
-              <div className="space-y-0.5">
-                <div className="text-sm font-medium text-zinc-300 group-hover:text-zinc-100 transition-colors">Загрузить контент</div>
-                <div className="text-xs text-zinc-500 max-w-[200px] leading-relaxed">
-                  {hint ?? "Фото, текстовый файл или PDF. Мы извлечем смыслы."}
-                </div>
-              </div>
+        <motion.div 
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          className="group relative rounded-[2rem] border-2 border-dashed border-zinc-800/40 bg-zinc-950/20 p-8 transition-all hover:border-emerald-500/20 hover:bg-emerald-500/[0.03] cursor-pointer"
+          onClick={() => ref.current?.click()}
+        >
+          <div className="flex flex-col items-center gap-5 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 text-zinc-500 group-hover:text-emerald-500 group-hover:border-emerald-500/30 transition-all flex items-center justify-center shadow-xl">
+               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             </div>
-            
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="rounded-xl border border-zinc-700/50 bg-zinc-800/50 px-4 py-2 text-xs font-medium text-zinc-200 hover:border-zinc-600 hover:bg-zinc-700 hover:text-white transition"
-                onClick={() => ref.current?.click()}
-              >
-                Выбрать
-              </button>
-
-              {/* Camera input for mobile support */}
-              <label className="rounded-xl border border-zinc-700/50 bg-zinc-800/50 px-4 py-2 text-xs font-medium text-zinc-200 hover:border-zinc-600 hover:bg-zinc-700 hover:text-white transition cursor-pointer select-none flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                <input
-                  className="hidden"
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={(e) => handleFiles(e.target.files)}
-                />
-              </label>
+            <div className="space-y-1.5">
+              <div className="text-[13px] font-black text-zinc-200 uppercase tracking-tight">Добавить файлы</div>
+              <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">
+                {hint ?? "Изображения или PDF до 5 МБ"}
+              </p>
             </div>
           </div>
-
-          <input
-            ref={ref}
-            className="hidden"
-            type="file"
-            multiple
-            accept="image/*,text/plain,application/pdf"
-            onChange={(e) => handleFiles(e.target.files)}
-          />
-        </div>
+          <input ref={ref} className="hidden" type="file" multiple accept="image/*,text/plain,application/pdf" onChange={(e) => handleFiles(e.target.files)} />
+        </motion.div>
       )}
 
-      {/* File List */}
-      <AnimatePresence mode="popLayout">
-        {files.length > 0 && (
-          <motion.div className="flex flex-col gap-2">
-             {files.map((f) => (
-                <motion.div
-                  key={f.id}
-                  layout
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-                  className="relative overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 pr-10"
-                >
-                  <div className="flex items-center gap-3 relative z-10">
-                     {/* Icon based on mimeType (simple logic) */}
-                     <div className="shrink-0 w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400">
-                        {f.file.type.startsWith("image") ? (
-                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                        ) : (
-                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                        )}
-                     </div>
-                     
-                     <div className="min-w-0 flex-1">
-                        <div className="text-xs font-medium text-zinc-200 truncate">{f.file.name}</div>
-                        <div className="text-[10px] text-zinc-500 mt-0.5 flex items-center gap-2">
-                           <span>{(f.file.size / 1024).toFixed(1)} KB</span>
-                           {f.status === "error" && <span className="text-rose-400">• {f.errorMessage}</span>}
-                        </div>
-                     </div>
+      <div className="space-y-3">
+        <AnimatePresence mode="popLayout">
+          {files.map((f) => {
+            const { label, style } = getFormatDetails(f.file.type);
+            return (
+              <motion.div
+                key={f.id}
+                layout
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                className="group relative overflow-hidden rounded-[1.5rem] border border-zinc-800/40 bg-zinc-900/40 p-5 shadow-xl transition-all hover:border-zinc-700/60"
+              >
+                <div className="flex items-center gap-5 relative z-10">
+                   <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center border font-mono text-[10px] font-black ${style}`}>
+                      {label}
+                   </div>
+                   
+                   <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-4 mb-2">
+                         <span className="text-[13px] font-bold text-zinc-100 truncate">{f.file.name}</span>
+                         {f.status === "uploading" && (
+                           <span className="text-[10px] font-black font-mono text-emerald-400">{f.progress}%</span>
+                         )}
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                         <span className="text-[10px] font-bold text-zinc-600 font-mono">
+                           {(f.file.size / 1024).toFixed(0)} KB
+                         </span>
+                         {f.status === "error" && (
+                           <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">{f.errorMessage}</span>
+                         )}
+                         {f.status === "success" && (
+                           <div className="flex items-center gap-1.5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              <span className="text-[9px] font-black text-emerald-500/60 uppercase tracking-widest">OK</span>
+                           </div>
+                         )}
+                      </div>
+                   </div>
 
-                     {/* Status Indicators */}
-                     <div className="shrink-0 text-zinc-500">
-                        {f.status === "uploading" && (
-                           <div className="w-4 h-4 rounded-full border-2 border-zinc-600 border-t-emerald-500 animate-spin" />
-                        )}
-                        {f.status === "success" && (
-                           <svg className="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                        )}
-                        {f.status === "error" && (
-                           <svg className="w-5 h-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        )}
-                     </div>
-                  </div>
-                  
-                  {/* Remove Button */}
-                  <button 
-                     onClick={() => removeFile(f.id)}
-                     className="absolute top-1/2 -translate-y-1/2 right-2 p-1.5 rounded-lg text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 transition z-20"
-                  >
-                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                  </button>
-
-                  {/* Progress Bar */}
-                  {f.status === "uploading" && (
-                     <div className="absolute bottom-0 left-0 h-0.5 bg-emerald-500 transition-all duration-300" style={{ width: `${f.progress}%` }} />
-                  )}
-                </motion.div>
-             ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+                   <button 
+                     onClick={(e) => { e.stopPropagation(); removeFile(f.id); }}
+                     className="shrink-0 w-9 h-9 rounded-xl bg-zinc-800/50 text-zinc-600 hover:text-rose-400 hover:bg-rose-500/5 transition-all flex items-center justify-center border border-transparent hover:border-rose-500/20"
+                   >
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                   </button>
+                </div>
+                
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-800/20">
+                   {f.status === "uploading" && (
+                     <motion.div 
+                       className="h-full bg-emerald-500"
+                       initial={{ width: 0 }}
+                       animate={{ width: `${f.progress}%` }}
+                     />
+                   )}
+                </div>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
     </div>
   );
-}
+};

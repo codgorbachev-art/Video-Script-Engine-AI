@@ -1,3 +1,4 @@
+
 export interface Attachment {
   name: string;
   mimeType: string;
@@ -17,13 +18,19 @@ export interface GenerateOptions {
   ctaStrength: "soft" | "hard";
 }
 
+// Added missing interface for the generation request object
 export interface GenerateRequest {
   input: GenerateInput;
   options: GenerateOptions;
-  client: {
+  client?: {
     tz: string;
     uiVersion: string;
   };
+}
+
+export interface GroundingSource {
+  title: string;
+  uri: string;
 }
 
 export interface Shot {
@@ -43,6 +50,7 @@ export interface GenerateResult {
   thumbnailIdeas: string[];
   hashtags: string[];
   checklist: string[];
+  sources?: GroundingSource[];
 }
 
 export interface Limits {
@@ -50,15 +58,4 @@ export interface Limits {
   dailyLimit: number;
   usedToday: number;
   remainingToday: number;
-}
-
-export interface GenerateResponse {
-  ok: boolean;
-  requestId: string;
-  limits: Limits;
-  result: GenerateResult;
-  usage: {
-    model: string;
-  };
-  errors: string[];
 }

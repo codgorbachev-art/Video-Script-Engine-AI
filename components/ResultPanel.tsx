@@ -1,115 +1,206 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { GenerateResult } from "../types";
+
+interface SectionProps {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+  badge?: string;
+}
+
+const CollapsibleSection: React.FC<SectionProps> = ({ title, isOpen, onToggle, children, icon, badge }) => (
+  <motion.div layout className="border-b border-zinc-800/40 last:border-0">
+    <button onClick={onToggle} className="w-full flex flex-col sm:flex-row sm:items-center justify-between px-6 md:px-10 py-8 md:py-10 hover:bg-zinc-800/20 transition-all text-left group gap-4">
+      <div className="flex items-center gap-5 md:gap-8 min-w-0">
+        <div className={`p-3.5 md:p-4 rounded-2xl md:rounded-3xl transition-all shadow-lg shrink-0 ${isOpen ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-zinc-900 text-zinc-600 border border-zinc-800/50'}`}>{icon}</div>
+        <div className="flex flex-col min-w-0">
+          <span className={`text-[12px] md:text-[14px] font-black uppercase tracking-[0.2em] md:tracking-[0.4em] transition-colors truncate ${isOpen ? 'text-zinc-100' : 'text-zinc-500 group-hover:text-zinc-300'}`}>{title}</span>
+          {badge && <span className="text-[8px] md:text-[9px] font-bold text-emerald-500/60 uppercase tracking-widest mt-1 font-mono">{badge}</span>}
+        </div>
+      </div>
+      <motion.div animate={{ rotate: isOpen ? 180 : 0 }} className={`shrink-0 self-end sm:self-center ${isOpen ? 'text-emerald-500' : 'text-zinc-700'}`}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="6 9 12 15 18 9"/></svg>
+      </motion.div>
+    </button>
+    <AnimatePresence initial={false}>
+      {isOpen && (
+        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+          <div className="px-6 md:px-10 pb-12 md:pb-16 pt-2 text-zinc-300 min-w-0">{children}</div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </motion.div>
+);
 
 export function ResultPanel(props: {
   loading: boolean;
   error: string | null;
-  markdown: string;
+  result: GenerateResult | null;
   onCopy: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({ research: true, script: true, shots: true });
+  const [loadingStep, setLoadingStep] = useState(0);
+
+  const loadingSteps = [
+    "Deep Research: Подключение к базам данных...",
+    "Анализ объекта: Идентификация и спецификации...",
+    "Market Intel: Сканирование отзывов и болей...",
+    "SEO Engine: Подбор триггеров и крючков...",
+    "Script Synthesis: Сборка экспертного контента...",
+    "Visual Plan: Генерация раскадровки сцен..."
+  ];
+
+  useEffect(() => {
+    let interval: any;
+    if (props.loading) {
+      interval = setInterval(() => setLoadingStep(p => (p + 1) % loadingSteps.length), 4000);
+    } else {
+      setLoadingStep(0);
+    }
+    return () => clearInterval(interval);
+  }, [props.loading]);
 
   const handleCopy = () => {
-    props.onCopy();
+    if (!props.result) return;
+    navigator.clipboard.writeText(props.result.scriptMarkdown);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  return (
-    <div className="group h-full flex flex-col rounded-[2.5rem] border border-white/10 bg-zinc-900/80 backdrop-blur-3xl shadow-2xl overflow-hidden relative">
-      {/* Optional: Subtle gradient glow inside the panel */}
-      <div className="absolute top-0 right-0 -mt-20 -mr-20 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] pointer-events-none" />
-      
-      {/* Header */}
-      <div className="relative z-10 flex items-center justify-between px-8 py-6 border-b border-white/5 bg-white/[0.02]">
-        <div className="flex items-center gap-3">
-           <div className={`h-2 w-2 rounded-full ring-2 ring-offset-2 ring-offset-zinc-900 transition-all duration-500 ${props.loading ? "bg-emerald-500 ring-emerald-500/50 animate-pulse" : props.markdown ? "bg-emerald-400 ring-emerald-400/20" : "bg-zinc-700 ring-zinc-700/50"}`}></div>
-           <span className="text-[13px] font-bold text-zinc-400 uppercase tracking-widest">
-             {props.loading ? "Генерация..." : "Сценарий"}
-           </span>
+  if (props.loading) {
+    return (
+      <div className="h-full min-h-[450px] md:min-h-[600px] glass-card rounded-[3rem] flex flex-col items-center justify-center p-8 md:p-12 text-center space-y-12 border border-zinc-800/50 shadow-2xl relative overflow-hidden">
+        <div className="absolute inset-0 bg-emerald-500/[0.01] animate-pulse" />
+        <div className="relative scale-90 md:scale-100 z-10">
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }} className="w-48 h-48 md:w-64 md:h-64 border border-emerald-500/5 rounded-full flex items-center justify-center">
+            <motion.div animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.3, 0.1] }} transition={{ duration: 5, repeat: Infinity }} className="w-32 h-32 md:w-48 md:h-48 border-2 border-dashed border-emerald-500/10 rounded-full" />
+          </motion.div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+             <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping mb-4" />
+             <span className="text-emerald-500/40 font-mono text-[9px] font-black uppercase tracking-[0.4em]">PROCESSING</span>
+          </div>
         </div>
-        
-        <button
-          type="button"
-          onClick={handleCopy}
-          disabled={!props.markdown || props.loading}
-          className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed group/btn"
-        >
-          <span className={`flex items-center gap-2 transition-transform duration-300 ${copied ? "-translate-y-8" : "translate-y-0"}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            Копировать
-          </span>
-          <span className={`absolute inset-0 flex items-center justify-center gap-2 text-emerald-400 transition-transform duration-300 ${copied ? "translate-y-0" : "translate-y-8"}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            Скопировано
-          </span>
-        </button>
+        <div className="space-y-6 w-full max-w-sm z-10">
+          <h3 className="text-lg md:text-xl font-black uppercase tracking-[0.3em] text-white/90">DEEP RESEARCH ENGINE</h3>
+          <div className="h-10 overflow-hidden px-4">
+            <AnimatePresence mode="wait">
+              <motion.p key={loadingStep} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -20, opacity: 0 }} className="text-emerald-500/60 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.2em] font-mono leading-tight">{loadingSteps[loadingStep]}</motion.p>
+            </AnimatePresence>
+          </div>
+          <div className="w-full h-1 bg-zinc-900/50 rounded-full overflow-hidden">
+             <motion.div initial={{ width: "0%" }} animate={{ width: `${((loadingStep + 1) / loadingSteps.length) * 100}%` }} className="h-full bg-emerald-500 shadow-[0_0_15px_#10b981]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (props.error) {
+    return (
+      <div className="glass-card rounded-[2.5rem] p-12 text-center border border-rose-500/20 shadow-xl">
+        <div className="w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center mx-auto mb-8 text-rose-500 border border-rose-500/20">
+           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <p className="text-rose-200/60 text-[11px] font-black uppercase tracking-widest">{props.error}</p>
+        <button onClick={() => window.location.reload()} className="mt-8 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors underline underline-offset-8">Перезагрузить систему</button>
+      </div>
+    );
+  }
+
+  if (!props.result) {
+    return (
+      <div className="h-full min-h-[400px] md:min-h-[600px] glass-card rounded-[2.5rem] md:rounded-[3rem] flex flex-col items-center justify-center p-12 opacity-30 text-zinc-700 text-center grayscale border border-zinc-900">
+         <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" className="mb-10"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+         <p className="text-[10px] font-black uppercase tracking-[1em]">SYSTEM_STANDBY</p>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div layout initial={{ opacity: 0, scale: 0.99 }} animate={{ opacity: 1, scale: 1 }} className="glass-card rounded-[2.5rem] md:rounded-[3rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.8)] border border-zinc-800/40">
+      <div className="p-5 md:p-8 border-b border-zinc-800/50 bg-emerald-500/[0.02] flex flex-col sm:flex-row gap-6 justify-between items-center">
+         <div className="flex items-center gap-4">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_12px_#10b981]" />
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500/80 font-mono">Status: Analysis_Finalized</span>
+         </div>
+         <button onClick={handleCopy} className={`w-full sm:w-auto px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${copied ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700/40'}`}>
+           {copied ? "Скопировано в буфер" : "Скопировать сценарий"}
+         </button>
       </div>
 
-      {/* Content Area */}
-      <div className="relative z-10 flex-1 p-0 overflow-y-auto custom-scrollbar bg-black/20">
-        {props.loading ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center h-full space-y-8 p-10"
-          >
-            <div className="relative w-20 h-20">
-              <div className="absolute inset-0 border-t-2 border-emerald-500 rounded-full animate-spin"></div>
-              <div className="absolute inset-2 border-r-2 border-emerald-500/50 rounded-full animate-spin duration-[1.5s]"></div>
-              <div className="absolute inset-4 border-l-2 border-emerald-500/30 rounded-full animate-spin duration-[2s]"></div>
-            </div>
-            <div className="text-center space-y-3">
-              <p className="text-lg font-medium text-zinc-200">Пишу сценарий...</p>
-              <div className="flex flex-col gap-1 text-xs text-zinc-500 font-mono uppercase tracking-wider">
-                <span className="animate-pulse">Анализ контекста</span>
-                <span className="animate-pulse delay-75">Подбор хуков</span>
-                <span className="animate-pulse delay-150">Структурирование кадров</span>
-              </div>
-            </div>
-          </motion.div>
-        ) : props.error ? (
-          <div className="h-full flex items-center justify-center p-10">
-             <div className="max-w-sm text-center space-y-4 p-8 rounded-3xl bg-rose-500/5 border border-rose-500/10">
-                <div className="w-12 h-12 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto text-rose-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                </div>
-                <div>
-                  <p className="text-base font-bold text-rose-200">Ошибка генерации</p>
-                  <p className="text-sm text-rose-300/60 mt-2 leading-relaxed">{props.error}</p>
-                </div>
+      <CollapsibleSection title="Technical Research" isOpen={openSections.research} onToggle={() => setOpenSections(p => ({...p, research: !p.research}))} badge="DATA ANALYTICS" icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>}>
+        <div className="p-6 md:p-10 rounded-[2rem] bg-black/50 border border-emerald-500/10 space-y-8 font-mono relative overflow-hidden group min-w-0">
+           <div className="relative z-10 space-y-6">
+             <div className="text-[9px] font-black text-emerald-500/50 uppercase tracking-[0.3em] mb-4 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" /> ОБЪЕКТ ИССЛЕДОВАНИЯ
              </div>
-          </div>
-        ) : props.markdown ? (
-          <div className="min-h-full p-8 md:p-10">
-            <pre className="whitespace-pre-wrap font-sans text-[15px] md:text-[16px] leading-8 text-zinc-100 tracking-normal">
-              {props.markdown}
-            </pre>
-            
-            {/* Footer hint */}
-            <div className="mt-12 pt-8 border-t border-white/5 text-center">
-                <p className="text-xs text-zinc-600">
-                    Совет: Скопируйте текст в Google Docs или Notion для дальнейшей работы.
-                </p>
-            </div>
-          </div>
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center text-zinc-600/50 select-none space-y-6 p-10">
-            <div className="relative group">
-                <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/20 to-blue-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition duration-700"></div>
-                <div className="relative p-6 rounded-[2rem] bg-zinc-900 border border-zinc-800 shadow-xl">
-                   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-500 group-hover:text-emerald-400 transition-colors duration-500"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                </div>
-            </div>
-            <div className="text-center space-y-2">
-                <p className="text-base font-medium text-zinc-400">Результат появится здесь</p>
-                <p className="text-sm text-zinc-600 max-w-[200px] mx-auto">
-                    Заполните параметры слева и нажмите «Сгенерировать»
-                </p>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+             <p className="text-zinc-100 text-[14px] md:text-[15px] leading-relaxed font-bold italic opacity-90">{props.result.extractedText}</p>
+           </div>
+           
+           {props.result.sources && props.result.sources.length > 0 && (
+             <div className="pt-8 border-t border-emerald-500/10 relative z-10">
+               <div className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-4">ВЕРИФИЦИРОВАННЫЕ ИСТОЧНИКИ</div>
+               <div className="flex flex-wrap gap-2.5">
+                 {props.result.sources.map((s, i) => (
+                   <a key={i} href={s.uri} target="_blank" rel="noopener noreferrer" className="px-3.5 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-[9px] font-bold text-zinc-500 hover:text-emerald-400 hover:border-emerald-500/30 transition-all truncate max-w-[160px] md:max-w-[200px] uppercase tracking-wider">
+                     {s.title}
+                   </a>
+                 ))}
+               </div>
+             </div>
+           )}
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Pro Script Engine" isOpen={openSections.script} onToggle={() => setOpenSections(p => ({...p, script: !p.script}))} badge="CONTENT DYNAMICS" icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}>
+        <div className="space-y-6 md:space-y-8 min-w-0">
+           {props.result.scriptMarkdown.split('\n').map((line, i) => {
+             const isHeader = line.startsWith('[') || line.startsWith('#') || line.toUpperCase().includes('АКТ') || line.toUpperCase().includes('СЦЕНА');
+             if (!line.trim()) return null;
+             return (
+               <p key={i} className={`${isHeader ? 'text-emerald-400 font-black mt-10 first:mt-4 mb-6 border-l-[4px] border-emerald-500 pl-6 text-lg md:text-xl uppercase tracking-tight' : 'text-zinc-100 font-semibold text-base md:text-lg leading-relaxed opacity-90'}`}>
+                 {line}
+               </p>
+             );
+           })}
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Storyboard Visuals" isOpen={openSections.shots} onToggle={() => setOpenSections(p => ({...p, shots: !p.shots}))} badge="SCENE BREAKDOWN" icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/></svg>}>
+        <div className="space-y-6 md:space-y-10 min-w-0">
+          {props.result.shots.map((shot, i) => (
+            <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="p-6 md:p-10 rounded-[2rem] bg-zinc-900/40 border border-zinc-800/50 flex flex-col lg:flex-row gap-8 lg:gap-12 hover:bg-zinc-900/60 transition-all group shadow-2xl">
+               <div className="lg:w-28 shrink-0 flex items-center lg:flex-col lg:items-start gap-6 lg:gap-0">
+                  <div className="px-3.5 py-1.5 rounded-xl bg-emerald-500 text-black font-mono font-black text-[10px] md:text-xs shadow-lg">
+                    {shot.t}
+                  </div>
+                  <div className="flex-1 lg:flex-none w-full h-px lg:w-[2px] lg:h-24 bg-zinc-800 rounded-full mt-5 group-hover:bg-emerald-500/20 transition-all" />
+               </div>
+               <div className="flex-1 space-y-8 min-w-0">
+                  <div className="space-y-3">
+                    <span className="text-[10px] font-black uppercase text-zinc-600 tracking-[0.3em] block font-mono">Визуальный план</span>
+                    <p className="text-zinc-100 font-black leading-tight text-lg md:text-xl">{shot.frame}</p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-8 pt-2">
+                     <div className="p-6 rounded-[1.5rem] md:rounded-[2rem] bg-black/50 border border-zinc-800/40 hover:border-zinc-700/60 transition-all">
+                        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-3 font-mono">Аудио / Диктор</span>
+                        <p className="text-[15px] text-zinc-400 font-medium italic leading-relaxed">«{shot.voiceOver}»</p>
+                     </div>
+                     <div className="p-6 rounded-[1.5rem] md:rounded-[2rem] bg-emerald-500/[0.03] border border-emerald-500/10 hover:border-emerald-500/20 transition-all">
+                        <span className="text-[9px] font-black text-emerald-500/40 uppercase tracking-widest block mb-3 font-mono">Графика на экране</span>
+                        <p className="text-[15px] text-emerald-100 font-black uppercase tracking-wide leading-tight">{shot.onScreenText}</p>
+                     </div>
+                  </div>
+               </div>
+            </motion.div>
+          ))}
+        </div>
+      </CollapsibleSection>
+    </motion.div>
   );
 }

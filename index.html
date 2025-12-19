@@ -1,52 +1,81 @@
+
 <!DOCTYPE html>
 <html lang="ru">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#09090b" />
-    <title>Сценарист AI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#050505" />
+    <title>Сценарист AI | Pro Video Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
       :root {
         color-scheme: dark;
       }
       body {
-        background-color: #09090b; /* zinc-950 */
-        color: #f4f4f5; /* zinc-100 */
-        font-family: 'Inter', sans-serif;
+        background-color: #050505;
+        color: #fafafa;
+        font-family: 'Manrope', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+        width: 100vw;
       }
-      /* Custom scrollbar for better aesthetics */
+      
+      .font-mono {
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+      .glass-card {
+        background: rgba(9, 9, 11, 0.6);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      
       ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+        width: 6px;
       }
       ::-webkit-scrollbar-track {
-        background: #18181b; 
+        background: #050505;
       }
       ::-webkit-scrollbar-thumb {
-        background: #3f3f46; 
-        border-radius: 4px;
+        background: #18181b;
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.05);
       }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #52525b; 
+
+      /* Исправление обрезания контента в Flex/Grid */
+      * {
+        min-width: 0;
+      }
+
+      /* Специфичные фиксы для iOS Safari */
+      @supports (-webkit-touch-callout: none) {
+        .min-h-screen {
+          min-height: -webkit-fill-available;
+        }
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "framer-motion": "https://esm.sh/framer-motion@^12.23.26",
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.11.0"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
+    <script type="importmap">
+    {
+      "imports": {
+        "react/": "https://esm.sh/react@^19.2.3/",
+        "react": "https://esm.sh/react@^19.2.3",
+        "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+        "framer-motion": "https://esm.sh/framer-motion@^12.23.26",
+        "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+        "react-router-dom": "https://esm.sh/react-router-dom@^7.11.0",
+        "vite": "https://esm.sh/vite@^7.3.0"
+      }
+    }
+    </script>
+  <link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="root"></div>

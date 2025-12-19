@@ -1,149 +1,114 @@
-import { GoogleGenAI } from "@google/genai";
-import { GenerateRequest, GenerateResult } from "../types";
-import { stripCodeFences } from "../utils";
 
-const SYSTEM_PROMPT_RU = `ПРОМПТ ДЛЯ GEMINI 3 FLASH — “VIDEO SCRIPT ENGINE (ADAPTIVE 10s–30min, X3 QUALITY)”
+import { GoogleGenAI, Type } from "@google/genai";
+import { GenerateRequest, GenerateResult, GroundingSource } from "../types";
+import { stripCodeFences, extractJson } from "../utils";
 
-Ты — Video Script Engine: топ-креатор (Shorts/Reels/TikTok/YouTube), кино-сценарист, режиссёр монтажа, продюсер, профессиональный маркетолог и SMM-стратег + редактор и факт-чекер.
-Твоя задача — по запросу пользователя и материалам создать сценарий видео с точным таймингом, соответствующий параметрам платформы и длительности, с X3 анализом, X3 проверкой, X3 генерацией, и только затем финальной выдачей.
+const SYSTEM_INSTRUCTION = `Ты — элитный бизнес-аналитик и ведущий сценарист для индустриальных и технологических рынков. 
 
-1) ВХОДНЫЕ ДАННЫЕ (ПРИХОДЯТ ОТ ПРИЛОЖЕНИЯ)
-Topic: тема/идея/черновик пользователя
-Materials[]: до N материалов (текст/изображения/PDF) — считаются источниками
-Platform: YouTube / YouTube Shorts / TikTok / Reels / VK / Telegram
-AspectRatio: 16:9 / 9:16 / 1:1
-DurationSec: длительность в секундах (может быть от 10 до 1800)
-Format: говорящая голова / VO / интервью / обзор / туториал / документалка / скетч
-Style: стиль подачи (например сторителлинг / провокация / обучение / развлечение)
-Goal: цель (экспертиза / продажа / вовлечение / реклама)
-CTAType: мягкий/нативный или иной
-Language: язык
-Constraints: запреты/юридические требования/тон бренда/табу-слова
-SpeechWPM: темп речи (если нет — 150 wpm)
+ТВОЯ МИССИЯ: Превратить скучный технический запрос в виральный, экспертный контент, базируясь на РЕАЛЬНЫХ данных.
 
-Если часть данных отсутствует — делай безопасные допущения (Assumption) и снижай категоричность. Не задавай вопросов.
+ТВОЙ АЛГОРИТМ (ULTRA-RESEARCH MODE):
+1. ИДЕНТИФИКАЦИЯ КОНТЕКСТА: 
+   - Если видишь "Гранд 2", "Putzmeister", "PFT G4" — это штукатурные станции.
+   - Если видишь "АСК", "ERP", "SaaS" — это IT-решения.
+   - Используй Google Search, чтобы вытащить: ТТХ, цену, страну бренда, ключевых конкурентов.
 
-2) ЖЁСТКИЕ ПРАВИЛА
-Факты и цифры: категоричность только при наличии подтверждения из Materials или Topic. Иначе — мягкие формулировки.
-Тайминг: речь и сцены обязаны совпадать по длительности.
-Детализация: чем короче ролик — тем плотнее и конкретнее. Чем длиннее — тем больше структурных блоков, но без воды.
-Платформа-специфика: Shorts/Reels/TikTok требуют более частых “re-hook”, длинный YouTube допускает глубину и паузы.
-Вывод всегда производственный: по сценам понятно, что снимать/генерировать/монтировать.
+2. АНАЛИЗ ЦЕЛЕВОЙ АУДИТОРИИ (ЦА):
+   - Определи, кто это смотрит: Прораб (важна скорость и надежность), Инвестор (важна окупаемость), Мастер (важна эргономика).
+   - Найди реальные "боли" из отзывов и форумов.
 
-3) АВТО-РЕЖИМЫ ПО ДЛИТЕЛЬНОСТИ (ОБЯЗАТЕЛЬНО)
-Определи режим по DurationSec и применяй соответствующую структуру и шаг таймкода.
-Режим A: 10–20 сек (Micro). Цель: один инсайт/одна мысль/один “вау”. Hook: 0–1.5 сек. Re-hook: каждые 4–6 сек. CTA: 1 короткая строка. Таймкод: по 1 сек.
-Режим B: 21–60 сек (Short). Цель: 1 кейс или 3 тезиса + вывод. Hook: 0–2 сек. Re-hook: каждые 8–12 сек. CTA: мягкий, 2–5 сек. Таймкод: по 1 сек.
-Режим C: 61–180 сек (Long Short / 1–3 мин). Цель: история + доказательство + практический вывод. Hook: 0–5 сек. Re-hook: каждые 12–18 сек. CTA: мягкий mid-CTA + финальный. Таймкод: шаг 2 сек.
-Режим D: 181–600 сек (Mid / 3–10 мин). Цель: полноценная структура “проблема → решение → разбор → примеры → вывод”. Hook: 0–10 сек. Re-hook: каждые 20–35 сек. CTA: mid-CTA на 30–60% + финальный. Таймкод: шаг 5 сек (ключевые — 2 сек).
-Режим E: 601–1800 сек (Long / 10–30 мин). Цель: глубокий разбор/док. Hook: 0–20 сек. Re-hook: каждые 45–90 сек. CTA: мягкий mid-CTA каждые 6–10 мин, финальный CTA. Таймкод: по сегментам + шаг 10 сек (ключевые — 5 сек).
+3. СЦЕНАРНАЯ ИНЖЕНЕРИЯ:
+   - Структура должна быть "железной": Крючок (Hook) -> Проблема -> Решение через объект запроса -> Техническое доказательство -> Призыв (CTA).
+   - Используй профессиональный сленг индустрии, но делай его понятным.
 
-4) РАСЧЁТ РЕЧИ И НОРМЫ ТЕКСТА (ОБЯЗАТЕЛЬНО)
-Используй темп SpeechWPM (если нет — 150).
-WordsAllowed = DurationSec * (SpeechWPM / 60).
-Общий текст должен быть в пределах ±5% от WordsAllowed.
-Для каждого тайм-блока проверяй соответствие: ориентир слов/сек = SpeechWPM / 60.
-
-5) ПРОЦЕСС КАЧЕСТВА: X3 АНАЛИЗ → X3 ПРОВЕРКА → X3 ГЕНЕРАЦИЯ
-X3 ANALYSIS: Сканирование, Приоритизация, Платформа.
-X3 CHECK: Факт-чек, Конфликты, Тайминг.
-X3 GENERATION: Сгенерируй 3 варианта (Retention/Trust/Clarity). Выбери лучший.
-
-6) ФИНАЛЬНЫЙ ВЫВОД (СТРОГО JSON)
-Верни ответ СТРОГО в формате JSON.
-Поля JSON должны быть заполнены на основе следующей структуры вывода:
-
-1. "titleOptions": Название (3 варианта) из Паспорта ролика.
-2. "hookOptions": Hook вариации.
-3. "scriptMarkdown": В это поле помести весь текстовый контент в формате Markdown:
-   - ## Паспорт ролика (Big Promise, ЦА, Контекст, Платформа, CTA)
-   - ## Структура (Главы/блоки)
-   - ## Почему это сработает (Hook logic, Trust, CTA logic)
-   - ## Самоаудит (Тайминг, Безопасность, Стиль)
-4. "shots": Сформируй список кадров для "3) Сценарий с таймкодом".
-   - t: Timecode
-   - frame: Visual + Camera
-   - onScreenText: On-screen text
-   - voiceOver: VO/Host lines
-   - broll: B-roll/Cutaways + SFX/Music + Edit notes
-5. "checklist": "4) Shot List и ассеты" (Что снять, графика, субтитры).
-6. "thumbnailIdeas": Идеи для превью.
-7. "hashtags": Хэштеги.
-
-JSON SCHEMA:
-{
-  "extractedText": "string",
-  "titleOptions": ["string"],
-  "hookOptions": ["string"],
-  "scriptMarkdown": "string",
-  "shots": [{ "t": "string", "frame": "string", "onScreenText": "string", "voiceOver": "string", "broll": "string" }],
-  "thumbnailIdeas": ["string"],
-  "hashtags": ["string"],
-  "checklist": ["string"]
-}
-`.trim();
-
-const MODEL_NAME = "gemini-3-flash-preview";
+ТРЕБОВАНИЯ К JSON:
+- extractedText: Полный технический паспорт объекта + анализ рынка в 2-3 абзацах.
+- scriptMarkdown: Профессиональная разметка с указанием интонаций и пауз.
+- shots: Минимум один кадр на 10 секунд. Описывай свет, фокусное расстояние (например, "крупный план форсунки") и движение камеры.
+`;
 
 export async function generateScenario(req: GenerateRequest): Promise<GenerateResult> {
-  const apiKey = process.env.API_KEY;
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  if (!apiKey) {
-    throw new Error("API Key is missing. Environment variable API_KEY must be set.");
-  }
+  const duration = req.options.durationSec;
+  const wordsPerMinute = 135; // Чуть быстрее для динамики
+  const targetWordCount = Math.floor((duration / 60) * wordsPerMinute);
+  const minShots = Math.max(6, Math.ceil(duration / 8));
 
-  const ai = new GoogleGenAI({ apiKey });
-
-  const parts: any[] = [];
-
-  // Handle attachments
-  for (const a of req.input.attachments || []) {
-    parts.push({
-      inlineData: {
-        mimeType: a.mimeType,
-        data: a.dataBase64
-      }
+  const promptParts: any[] = [];
+  
+  if (req.input.attachments?.length) {
+    req.input.attachments.forEach(a => {
+      promptParts.push({ inlineData: { mimeType: a.mimeType, data: a.dataBase64 } });
     });
   }
 
-  const aspectRatio = req.options.platform === 'youtube' ? '16:9' : '9:16';
-  
-  // Format the input exactly as the system prompt expects in section 7
-  const promptInput = `
-7) ДАННЫЕ ПОЛЬЗОВАТЕЛЯ
-Topic: ${req.input.text || "Тема не указана, проанализируй вложения или предложи трендовую тему."}
-Materials: ${req.input.attachments?.map(a => a.name).join(", ") || "Нет вложений"}
-Platform: ${req.options.platform}
-AspectRatio: ${aspectRatio}
-DurationSec: ${req.options.durationSec}
-Format: ${req.options.style} (адаптируй под платформу)
-Style: ${req.options.style}
-Goal: ${req.options.direction}
-CTAType: ${req.options.ctaStrength}
-Language: Русский
-SpeechWPM: 150
-Constraints: Соблюдай авторские права, без политики.
+  const promptText = `
+ПРИКАЗ НА ГЕНЕРАЦИЮ (ГЛУБОКИЙ РЕЖИМ):
+ОБЪЕКТ: "${req.input.text || "Анализ файлов"}"
+ПЛАТФОРМА: ${req.options.platform}
+ТАЙМИНГ: ${duration} сек.
+СТИЛЬ: ${req.options.style}
+ЦЕЛЬ: ${req.options.direction}
 
-Если есть вложения, сначала извлеки из них текст и смыслы, затем используй как Materials.
+ИНСТРУКЦИЯ:
+1. Выполни поиск в Google: найди актуальные спецификации, отзывы и конкурентов объекта.
+2. Составь "Техническую справку" (extractedText), которая докажет пользователю, что ты "в теме".
+3. Напиши сценарий на ~${targetWordCount} слов. Используй триггеры экспертности.
+4. Создай визуальный ряд из ${minShots} сцен.
+
+ВЕРНИ СТРОГИЙ JSON:
+{
+  "extractedText": "Deep Research Report: ТТХ, боли аудитории, рыночное сравнение...",
+  "titleOptions": ["3 варианта заголовка для профи"],
+  "hookOptions": ["3 мощных зацепки"],
+  "scriptMarkdown": "Текст сценария...",
+  "shots": [{ "t": "00:00", "frame": "Описание кадра", "onScreenText": "Текст", "voiceOver": "Диктор", "broll": "SFX/Music" }],
+  "thumbnailIdeas": ["Идеи для обложек"],
+  "hashtags": ["Теги"],
+  "checklist": ["Советы по съемке этого объекта"]
+}
   `.trim();
 
-  parts.push({ text: promptInput });
+  promptParts.push({ text: promptText });
 
-  try {
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: { parts },
-      config: {
-        systemInstruction: SYSTEM_PROMPT_RU,
-        thinkingConfig: { thinkingBudget: 1024 } // Setting a modest thinking budget for v3
-      }
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-pro-preview',
+    contents: [{ parts: promptParts }],
+    config: {
+      systemInstruction: SYSTEM_INSTRUCTION,
+      responseMimeType: "application/json",
+      thinkingConfig: { thinkingBudget: 31000 },
+      tools: [{ googleSearch: {} }]
+    }
+  });
+
+  const rawText = response.text || "{}";
+  const result = JSON.parse(extractJson(stripCodeFences(rawText))) as GenerateResult;
+
+  const sources: GroundingSource[] = [];
+  const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+  if (chunks) {
+    chunks.forEach((chunk: any) => {
+      if (chunk.web) sources.push({ title: chunk.web.title, uri: chunk.web.uri });
     });
-
-    const raw = response.text || "";
-    const cleaned = stripCodeFences(raw);
-    return JSON.parse(cleaned) as GenerateResult;
-  } catch (e: any) {
-    console.error("Gemini API Error:", e);
-    throw new Error(e.message || "Failed to generate content");
   }
+
+  return { ...result, sources: sources.length > 0 ? sources : undefined };
+}
+
+export async function generateThumbnailVisual(idea: string): Promise<string> {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-pro-image-preview',
+    contents: [{ parts: [{ text: `High-end commercial videography style, 8k resolution, cinematic lighting: ${idea}. Professional color grading, sharp focus.` }] }],
+    config: {
+      imageConfig: { aspectRatio: "16:9", imageSize: "1K" }
+    }
+  });
+
+  for (const part of response.candidates?.[0].content.parts || []) {
+    if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+  }
+  throw new Error("Visual fail");
 }
